@@ -2,6 +2,7 @@
 
 const assert = require('assert');
 const debug = require('./src');
+const util = require('util');
 
 describe('debug', () => {
 	it('passes a basic sanity check', () => {
@@ -116,6 +117,44 @@ describe('debug', () => {
 			debug.enable(namespaces);
 			assert.deepStrictEqual(oldNames.map(String), debug.names.map(String));
 			assert.deepStrictEqual(oldSkips.map(String), debug.skips.map(String));
+		});
+	});
+
+	describe('custom formatters', () => {
+
+		it('handles formatters', () => {
+			const log = debug('test');
+			debug.formatters.x = (v) => (v ** 2).toString();
+			log.enabled = true;
+
+			const messages = [];
+			const escSeqs = /\x1b\[(.+?)\d+m/g;
+			log.log = (...args) => {
+				args[0] = args[0].replace(escSeqs, '');
+				messages.push(util.format.apply(null, args));
+			};
+
+			const tests = [
+				['pretty-print single line %o', {single: 'line'}],
+				['insert a string %s', 'here'],
+				['insert a number %d', 42],
+				['insert json %j', {json: {object: 'here'}}],
+				['insert a single %% sign'],
+				['format something else %x', 12],
+			];
+			const expected = [
+				'pretty-print single line {single: \'line\'}',
+				'insert a string here',
+				'insert a number 42',
+				'insert json {"json": {"object": "here"}}',
+				'insert a single % sign',
+				'format something else 144',
+			];
+
+			for (let i = 0; i < tests.length; i++) {
+				log.apply(null, tests[i]);
+				assert.deepStrictEqual(messages[i], expected[i]);
+			}
 		});
 	});
 });
